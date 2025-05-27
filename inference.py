@@ -59,22 +59,18 @@ class self_attention(nn.Module):
         self.softmax = nn.Softmax(dim=-1)
 
     def forward(self, Q, K, V, attn_mask=None):
-        # Q, K, V shape: (batch, seq_len, dim)
         batch_size, seq_len, dim = Q.size()
 
         scores = torch.matmul(Q, K.transpose(-2, -1)) / math.sqrt(dim)  # (batch, seq_len, seq_len)
 
-        # Causal mask (upper triangular)
         causal_mask = torch.triu(torch.ones(seq_len, seq_len, device=Q.device) * float('-inf'), diagonal=1)
         scores = scores + causal_mask
 
-        # Padding mask (optional)
         if attn_mask is not None:
-            # attn_mask: (batch, 1, seq_len), 1 for keep, 0 for mask
             scores = scores.masked_fill(attn_mask == 0, float('-inf'))
 
         weights = self.softmax(scores)
-        context = torch.matmul(weights, V)  # (batch, seq_len, dim)
+        context = torch.matmul(weights, V)
 
         return context
 
@@ -151,14 +147,14 @@ inference_model.eval()
 import torch
 
 def generate_sequence(model, start_text, vocab_to_idx, idx_to_vocab, embedding_layer, device, max_len=50):
-    model.eval()  # Setting the model to evaluation mode
+    model.eval()
     start_tokens = start_text.lower().split()
 
     # Convert words to indices
     input_ids = [vocab_to_idx.get(word, vocab_to_idx["<pad>"]) for word in start_tokens]
     generated = torch.tensor(input_ids, dtype=torch.long, device=device).unsqueeze(0)  # (1, seq_len)
 
-    for _ in range(max_len):
+    for wop in range(max_len):
         seq_len = generated.size(1)
 
         # Recalculate positional encodings each time
@@ -188,11 +184,11 @@ def generate_sequence(model, start_text, vocab_to_idx, idx_to_vocab, embedding_l
 
     # Convert generated indices back to words
     generated_text = ' '.join([idx_to_vocab.get(idx.item(), "<unk>") for idx in generated.squeeze()])
-    return generated_text
+    return generated_text, wop
 
 # Example of inference usage:
 start_text = "<start>"  # Starting text for generation
-generated_text = generate_sequence(
+generated_text, wop = generate_sequence(
     model=inference_model, 
     start_text=start_text, 
     vocab_to_idx=vocab_to_index, 
@@ -202,5 +198,6 @@ generated_text = generate_sequence(
     max_len=50  # Limit generated sequence length
 )
 
+print("Number of words generated: ", wop)
 print("Generated Text:")
 print(generated_text)
